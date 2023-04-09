@@ -1,4 +1,6 @@
 import json
+import os
+
 import requests
 import time
 from selenium import webdriver
@@ -12,6 +14,7 @@ class PhotoBoothCrawler:
     def __init__(self, keywords):
         self.keywords = keywords
         self.booth_list = []
+        self.brand_list = []
         self.driver = self.set_chrome_driver()
         self.driver.implicitly_wait(1)
         self.driver.get(url="https://map.kakao.com/")
@@ -111,25 +114,52 @@ class PhotoBoothCrawler:
                     "tel": place.get("tel")
                 }
                 brand_name = place.get("brandName")
+
+                # 1차 필터링 (사진 부스 아닌 장소)
                 if (brand_name not in self.keywords) and ("사진" not in brand_name) and ("포토" not in brand_name):
                     continue
+                # 2차 가공 brand name 지정
+                if brand_name in ["즉석사진", "사진", "사진관,포토스튜디오", "사진인화,현상", "대여사진관"]:
+                    brand_name = place.get("name").split(" ")[0]
+                    booth["brand_name"] = brand_name
+                if brand_name not in self.brand_list:
+                    self.brand_list.append(brand_name)
                 self.booth_list.append(booth)
 
     def convert_dict_to_csv(self):
         now = date.today().strftime("%Y_%m_%d")
         df = pd.DataFrame(self.booth_list)
         df.drop_duplicates()
-        df.to_csv(f"photo_booth_{now}.csv", index=True)
+        df.to_csv(f"data_{now}/photo_booth_{now}.csv", index=True)
+
+    @staticmethod
+    def create_folder():
+        now = date.today().strftime("%Y_%m_%d")
+        directory = f"data_{now}"
+        try:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+        except OSError:
+            print('Error: Creating directory. ' + directory)
+
+    def write_brand_list(self):
+        now = date.today().strftime("%Y_%m_%d")
+        file = open(f"data_{now}/brand_list_{now}.txt", "w")
+        for brand in self.brand_list:
+            file.write(f"{brand}\t")
 
     def search(self):
         for idx, keyword in enumerate(self.keywords):
-            print(idx, keyword)
+            print(keyword)
+            print(idx)
             self.start_search(idx, keyword)
             time.sleep(0.2)
         log_data_list = self.get_data_from_log()
         self.set_data_to_list(log_data_list)
+        self.create_folder()
         self.convert_dict_to_csv()
+        self.write_brand_list()
 
 
-crawler = PhotoBoothCrawler(["즉석사진", "인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷"])
+crawler = PhotoBoothCrawler(["즉석사진", "인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트"])
 crawler.search()
