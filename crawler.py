@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Union
 
 import requests
 import time
@@ -8,13 +9,14 @@ from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.common.by import By
 from datetime import date
 import pandas as pd
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 class PhotoBoothCrawler:
-    def __init__(self, keywords):
+    def __init__(self, keywords, brand_list):
         self.keywords = keywords
         self.booth_list = []
-        self.brand_list = []
+        self.brand_list = brand_list
         self.driver = self.set_chrome_driver()
         self.driver.implicitly_wait(1)
         self.driver.get(url="https://map.kakao.com/")
@@ -27,7 +29,7 @@ class PhotoBoothCrawler:
         options.add_argument("--ignore-certificate-errors")
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_argument("headless")
-        return webdriver.Chrome(desired_capabilities=desired_capabilities, chrome_options=options)
+        return webdriver.Chrome(ChromeDriverManager().install(), desired_capabilities=desired_capabilities, chrome_options=options)
 
     def start_search(self, idx, keyword):
         input_selector = "search.keyword.query"
@@ -46,7 +48,7 @@ class PhotoBoothCrawler:
         idx = 1
         flag = True
         while flag:
-            print(idx)
+            print(f"page {idx}")
             next_page = idx % 5 + 1
 
             if idx == 1:
@@ -90,7 +92,7 @@ class PhotoBoothCrawler:
                         response = requests.get(url=request["url"], headers=request["headers"])
                         first_bracket_idx = response.text.index("(")+1
                         log_data = json.loads(response.text[first_bracket_idx:-2])
-                        print(f"log_page={idx}")
+                        print(f"log_page {idx}")
                         idx += 1
                         log_data_list.append(log_data)
 
@@ -101,6 +103,7 @@ class PhotoBoothCrawler:
             place_data_list = log_data["place"]
             for place in place_data_list:
                 booth = {
+                    "booth_id": place.get("confirmid"),
                     "booth_name": place.get("name"),
                     "brand_name": place.get("brandName"),
                     "address": place.get("address"),
@@ -109,22 +112,32 @@ class PhotoBoothCrawler:
                     "new_address_disp": place.get("new_address_disp"),
                     "homepage": place.get("homepage"),
                     "pay_keywords": place.get("pay_keywords_disp"),
+                    "booth_category": "photoBooth",
                     "x": place.get("x"),
                     "y": place.get("y"),
                     "tel": place.get("tel")
                 }
-                brand_name = place.get("brandName")
 
-                # 1차 필터링 (사진 부스 아닌 장소)
-                if (brand_name not in self.keywords) and ("사진" not in brand_name) and ("포토" not in brand_name):
-                    continue
-                # 2차 가공 brand name 지정
-                if brand_name in ["즉석사진", "사진", "사진관,포토스튜디오", "사진인화,현상", "대여사진관"]:
-                    brand_name = place.get("name").split(" ")[0]
-                    booth["brand_name"] = brand_name
-                if brand_name not in self.brand_list:
-                    self.brand_list.append(brand_name)
-                self.booth_list.append(booth)
+                booth = self.filter_booth_data(booth)
+                if booth is not None:
+                    self.booth_list.append(booth)
+
+    def filter_booth_data(self, booth: dict) -> Union[dict, None]:
+        brand_name = booth.get("brand_name")
+        if brand_name is None:
+            return None
+
+        # 1차 필터링 (사진 부스 아닌 장소)
+        if brand_name in ["ATM", "피자", "공간대여", "사격,궁도", "서비스,산업", "오락실", "제조업"]:
+            return None
+
+        # TODO: 같은 브랜드이지만 띄워쓰기 차이로 다른 브랜드 취급받는 것 예외처리
+        # 2차 가공 brand name 지정
+        if brand_name in ["즉석사진", "사진", "사진관,포토스튜디오", "사진인화,현상", "대여사진관"]:
+            brand_name = booth.get("booth_name").split(" ")[0]
+            booth["brand_name"] = brand_name
+
+        return booth
 
     def convert_dict_to_csv(self):
         now = date.today().strftime("%Y_%m_%d")
@@ -150,16 +163,17 @@ class PhotoBoothCrawler:
 
     def search(self):
         for idx, keyword in enumerate(self.keywords):
-            print(keyword)
-            print(idx)
+            print(f"{idx}.{keyword}")
             self.start_search(idx, keyword)
             time.sleep(0.2)
         log_data_list = self.get_data_from_log()
         self.set_data_to_list(log_data_list)
         self.create_folder()
         self.convert_dict_to_csv()
-        self.write_brand_list()
+        # self.write_brand_list()
 
 
-crawler = PhotoBoothCrawler(["즉석사진", "인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트"])
+search_list = ["즉석사진", "인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트"]
+init_brand_list = ["인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트"]
+crawler = PhotoBoothCrawler(search_list, init_brand_list)
 crawler.search()
