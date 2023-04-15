@@ -17,6 +17,7 @@ class PhotoBoothCrawler:
         self.keywords = keywords
         self.booth_list = []
         self.brand_list = brand_list
+        self.brand_info = {}
         self.driver = self.set_chrome_driver()
         self.driver.implicitly_wait(1)
         self.driver.get(url="https://map.kakao.com/")
@@ -120,6 +121,16 @@ class PhotoBoothCrawler:
 
                 booth = self.filter_booth_data(booth)
                 if booth is not None:
+                    brand = booth.get("brand_name")
+                    if brand not in self.brand_list:
+                        self.brand_list.append(brand)
+                    if brand in self.brand_info.keys():
+                        self.brand_info[brand]["count"] += 1
+                    else:
+                        self.brand_info[brand] = {
+                            "brand_name": brand,
+                            "count": 1
+                        }
                     self.booth_list.append(booth)
 
     def filter_booth_data(self, booth: dict) -> Union[dict, None]:
@@ -131,8 +142,12 @@ class PhotoBoothCrawler:
         if brand_name in ["ATM", "피자", "공간대여", "사격,궁도", "서비스,산업", "오락실", "제조업"]:
             return None
 
-        # TODO: 같은 브랜드이지만 띄워쓰기 차이로 다른 브랜드 취급받는 것 예외처리
-        # 2차 가공 brand name 지정
+        for brand in self.brand_list:
+            booth_name = booth["booth_name"].replace(" ", "")
+            if brand in booth_name:
+                brand_name = brand
+                booth["brand_name"] = brand_name
+
         if brand_name in ["즉석사진", "사진", "사진관,포토스튜디오", "사진인화,현상", "대여사진관"]:
             brand_name = booth.get("booth_name").split(" ")[0]
             booth["brand_name"] = brand_name
@@ -143,23 +158,23 @@ class PhotoBoothCrawler:
         now = date.today().strftime("%Y_%m_%d")
         df = pd.DataFrame(self.booth_list)
         df.drop_duplicates()
-        df.to_csv(f"data_{now}/photo_booth_{now}.csv", index=True)
+        df.to_csv(f"data/data_{now}/photo_booth_{now}.csv", index=True)
 
     @staticmethod
     def create_folder():
         now = date.today().strftime("%Y_%m_%d")
-        directory = f"data_{now}"
+        directory = f"data/data_{now}"
         try:
             if not os.path.exists(directory):
                 os.makedirs(directory)
         except OSError:
             print('Error: Creating directory. ' + directory)
 
-    def write_brand_list(self):
+    def write_brand_info(self):
         now = date.today().strftime("%Y_%m_%d")
-        file = open(f"data_{now}/brand_list_{now}.txt", "w")
-        for brand in self.brand_list:
-            file.write(f"{brand}\t")
+        df = pd.DataFrame(list(self.brand_info.values()))
+        df.drop_duplicates()
+        df.to_csv(f"data/data_{now}/brand_info_{now}.csv", index=True)
 
     def search(self):
         for idx, keyword in enumerate(self.keywords):
@@ -170,10 +185,11 @@ class PhotoBoothCrawler:
         self.set_data_to_list(log_data_list)
         self.create_folder()
         self.convert_dict_to_csv()
-        # self.write_brand_list()
+        self.write_brand_info()
+        temp_dict = {}
+        for idx, brand in enumerate(self.brand_list):
+            temp_dict[idx] = brand
+        print(temp_dict)
 
 
-search_list = ["즉석사진", "인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트"]
-init_brand_list = ["인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트"]
-crawler = PhotoBoothCrawler(search_list, init_brand_list)
-crawler.search()
+brand_info = {0: '인생네컷', 1: '포토이즘', 2: '하루필름', 3: '포토시그니처', 4: '셀픽스', 5: '플랜비스튜디오', 6: '포토이즘컬러드', 7: '인싸포토', 8: '홍대네컷', 9: '포토스트리트', 10: '1퍼센트', 11: '문래포토', 12: '포토하임', 13: '흑백사장', 14: '모노맨션', 15: 'RGB포토스튜디오', 16: '폴라스튜디오', 17: '시현하다프레임', 18: '픽닷', 19: '포토', 20: '스티카', 21: '플레이인더박스', 22: '무브먼트', 23: '그믐달셀프스튜디오', 24: '오아카이브스튜디오', 25: '포커스필름', 26: '흑백사진까망', 27: '돈룩업', 28: '모모필름', 29: '오늘우리사진관', 30: '더필름', 31: '무네이스튜디오', 32: '비룸스튜디오', 33: '신당이스냅', 34: '다비스튜디오', 35: '오늘사진'}
