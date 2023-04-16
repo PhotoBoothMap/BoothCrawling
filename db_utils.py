@@ -15,3 +15,10 @@ def query_db(query, db_uri):
     with engine.begin() as con:
         results = con.execute(sql)
     return results
+
+
+def insert_query_db(query, db_uri):
+    sql = text(query)
+    engine = create_engine(db_uri)
+    with engine.begin() as con:
+        con.execute(sql)

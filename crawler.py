@@ -11,13 +11,15 @@ from datetime import date
 import pandas as pd
 from webdriver_manager.chrome import ChromeDriverManager
 
+from db_query import insert_new_brand, insert_booth
+
 
 class PhotoBoothCrawler:
-    def __init__(self, keywords, brand_list):
-        self.keywords = keywords
+    def __init__(self, search_list, brand_info):
+        self.search_list = search_list
+        self.brand_info = brand_info
         self.booth_list = []
-        self.brand_list = brand_list
-        self.brand_info = {}
+        self.new_brand = []
         self.driver = self.set_chrome_driver()
         self.driver.implicitly_wait(1)
         self.driver.get(url="https://map.kakao.com/")
@@ -104,53 +106,57 @@ class PhotoBoothCrawler:
             place_data_list = log_data["place"]
             for place in place_data_list:
                 booth = {
-                    "booth_id": place.get("confirmid"),
-                    "booth_name": place.get("name"),
-                    "brand_name": place.get("brandName"),
-                    "address": place.get("address"),
-                    "address_disp": place.get("address_disp"),
-                    "new_address": place.get("new_address"),
-                    "new_address_disp": place.get("new_address_disp"),
-                    "homepage": place.get("homepage"),
-                    "pay_keywords": place.get("pay_keywords_disp"),
-                    "booth_category": "photoBooth",
-                    "x": place.get("x"),
-                    "y": place.get("y"),
-                    "tel": place.get("tel")
+                    "booth_id": place.get("confirmid", None),
+                    "booth_name": place.get("name", None),
+                    "brand": place.get("brandName", None),
+                    "address": place.get("address", None),
+                    "address_disp": place.get("address_disp", None),
+                    "new_address": place.get("new_address", None),
+                    "new_address_disp": place.get("new_address_disp", None),
+                    "homepage": place.get("homepage", None),
+                    "pay_keywords": place.get("pay_keywords_disp", None),
+                    "booth_type": "photoBooth",
+                    "x_coordinate": place.get("x", None),
+                    "y_coordinate": place.get("y", None),
+                    "tel": place.get("tel", None),
+                    "status": "activate"
                 }
 
                 booth = self.filter_booth_data(booth)
+
                 if booth is not None:
-                    brand = booth.get("brand_name")
-                    if brand not in self.brand_list:
-                        self.brand_list.append(brand)
-                    if brand in self.brand_info.keys():
-                        self.brand_info[brand]["count"] += 1
-                    else:
-                        self.brand_info[brand] = {
-                            "brand_name": brand,
-                            "count": 1
-                        }
+                    booth = self.convert_brand_name_to_id(booth)
                     self.booth_list.append(booth)
 
-    def filter_booth_data(self, booth: dict) -> Union[dict, None]:
-        brand_name = booth.get("brand_name")
+    @staticmethod
+    def filter_booth_data(booth: dict) -> Union[dict, None]:
+        brand_name = booth.get("brand")
         if brand_name is None:
             return None
 
         # 1차 필터링 (사진 부스 아닌 장소)
-        if brand_name in ["ATM", "피자", "공간대여", "사격,궁도", "서비스,산업", "오락실", "제조업"]:
+        if brand_name in ["ATM", "피자", "공간대여", "사격,궁도", "서비스,산업", "오락실", "제조업", "기업"]:
             return None
-
-        for brand in self.brand_list:
-            booth_name = booth["booth_name"].replace(" ", "")
-            if brand in booth_name:
-                brand_name = brand
-                booth["brand_name"] = brand_name
 
         if brand_name in ["즉석사진", "사진", "사진관,포토스튜디오", "사진인화,현상", "대여사진관"]:
             brand_name = booth.get("booth_name").split(" ")[0]
-            booth["brand_name"] = brand_name
+            booth["brand"] = brand_name
+
+        return booth
+
+    def convert_brand_name_to_id(self, booth):
+        flag = False
+        for brand in list(self.brand_info.keys()):
+            booth_name = booth["booth_name"].replace(" ", "")
+            if brand in booth_name:
+                brand_id = self.brand_info[brand]
+                booth["brand"] = brand_id
+                flag = True
+                break
+
+        if not flag:
+            if booth["brand"] not in self.new_brand and booth["brand"] != "포토":
+                self.new_brand.append(booth["brand"])
 
         return booth
 
@@ -170,14 +176,19 @@ class PhotoBoothCrawler:
         except OSError:
             print('Error: Creating directory. ' + directory)
 
-    def write_brand_info(self):
-        now = date.today().strftime("%Y_%m_%d")
-        df = pd.DataFrame(list(self.brand_info.values()))
-        df.drop_duplicates()
-        df.to_csv(f"data/data_{now}/brand_info_{now}.csv", index=True)
+    def remove_validation(self):
+        confirm_id_list = []
+        new_booth_list = []
+
+        for booth in self.booth_list:
+            if booth["booth_id"] not in confirm_id_list:
+                confirm_id_list.append(booth["booth_id"])
+                new_booth_list.append(booth)
+
+        self.booth_list = new_booth_list
 
     def search(self):
-        for idx, keyword in enumerate(self.keywords):
+        for idx, keyword in enumerate(self.search_list):
             print(f"{idx}.{keyword}")
             self.start_search(idx, keyword)
             time.sleep(0.2)
@@ -185,11 +196,6 @@ class PhotoBoothCrawler:
         self.set_data_to_list(log_data_list)
         self.create_folder()
         self.convert_dict_to_csv()
-        self.write_brand_info()
-        temp_dict = {}
-        for idx, brand in enumerate(self.brand_list):
-            temp_dict[idx] = brand
-        print(temp_dict)
-
-
-brand_info = {0: '인생네컷', 1: '포토이즘', 2: '하루필름', 3: '포토시그니처', 4: '셀픽스', 5: '플랜비스튜디오', 6: '포토이즘컬러드', 7: '인싸포토', 8: '홍대네컷', 9: '포토스트리트', 10: '1퍼센트', 11: '문래포토', 12: '포토하임', 13: '흑백사장', 14: '모노맨션', 15: 'RGB포토스튜디오', 16: '폴라스튜디오', 17: '시현하다프레임', 18: '픽닷', 19: '포토', 20: '스티카', 21: '플레이인더박스', 22: '무브먼트', 23: '그믐달셀프스튜디오', 24: '오아카이브스튜디오', 25: '포커스필름', 26: '흑백사진까망', 27: '돈룩업', 28: '모모필름', 29: '오늘우리사진관', 30: '더필름', 31: '무네이스튜디오', 32: '비룸스튜디오', 33: '신당이스냅', 34: '다비스튜디오', 35: '오늘사진'}
+        self.remove_validation()
+        insert_new_brand(self.new_brand)
+        insert_booth(self.booth_list)
