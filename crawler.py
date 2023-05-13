@@ -11,13 +11,14 @@ from datetime import date
 import pandas as pd
 from webdriver_manager.chrome import ChromeDriverManager
 
-from db_query import insert_new_brand, insert_booth
+from database.db_query import DatabaseQuery
 
 
 class PhotoBoothCrawler:
-    def __init__(self, search_list, brand_info):
-        self.search_list = search_list
-        self.brand_info = brand_info
+    def __init__(self, input_search_list):
+        self.db_query = DatabaseQuery()
+        self.search_list = input_search_list
+        self.brand_info = self.db_query.get_brand_id_name()
         self.booth_list = []
         self.new_brand = []
         self.driver = self.set_chrome_driver()
@@ -118,6 +119,8 @@ class PhotoBoothCrawler:
                     "booth_type": "photoBooth",
                     "x_coordinate": place.get("x", None),
                     "y_coordinate": place.get("y", None),
+                    "latitude": place.get("lat", None),
+                    "longitude": place.get("lon", None),
                     "tel": place.get("tel", None),
                     "status": "activate"
                 }
@@ -187,6 +190,11 @@ class PhotoBoothCrawler:
 
         self.booth_list = new_booth_list
 
+    def update_db(self):
+        self.db_query.insert_new_brand(self.new_brand)
+        # confirm_id_list = selfdb_query.get_confirm_id_list()
+        self.db_query.insert_booth(self.booth_list)
+
     def search(self):
         for idx, keyword in enumerate(self.search_list):
             print(f"{idx}.{keyword}")
@@ -197,5 +205,11 @@ class PhotoBoothCrawler:
         self.create_folder()
         self.convert_dict_to_csv()
         self.remove_validation()
-        insert_new_brand(self.new_brand)
-        insert_booth(self.booth_list)
+        self.db_query.insert_new_brand(self.new_brand)
+        self.db_query.insert_booth(self.booth_list)
+
+
+search_list = ["즉석사진", "인생네컷", "포토이즘박스", "하루필름", "포토시그니처", "셀픽스", "플랜비스튜디오", "포토이즘컬러드", "인싸포토", "홍대네컷", "포토스트리트", "포토매틱", "포토그레이", "비룸스튜디오", "모노멘션"]
+
+crawler = PhotoBoothCrawler(search_list)
+crawler.search()
