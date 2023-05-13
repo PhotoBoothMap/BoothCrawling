@@ -108,7 +108,7 @@ class PhotoBoothCrawler:
             for place in place_data_list:
                 booth = {
                     "booth_id": place.get("confirmid", None),
-                    "booth_name": place.get("name", None),
+                    "name": place.get("name", None),
                     "brand": place.get("brandName", None),
                     "address": place.get("address", None),
                     "address_disp": place.get("address_disp", None),

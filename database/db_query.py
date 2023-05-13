@@ -37,7 +37,7 @@ class DatabaseQuery(BaseDatabase):
             insert into photo_booth (
                 confirm_id,
                 brand, 
-                booth_name, 
+                name, 
                 address, 
                 new_address, 
                 homepage, 
@@ -52,7 +52,7 @@ class DatabaseQuery(BaseDatabase):
                 values
         """
 
-        value_list = ["booth_id", "brand", "booth_name", "address", "new_address", "homepage", "booth_type", "x_coordinate", "y_coordinate", "latitude", "longitude", "tel", "status"]
+        value_list = ["booth_id", "brand", "name", "address", "new_address", "homepage", "booth_type", "x_coordinate", "y_coordinate", "latitude", "longitude", "tel", "status"]
         for booth in booth_list:
             value_query = "("
             for value in value_list:
