@@ -122,7 +122,7 @@ class PhotoBoothCrawler:
                     "latitude": place.get("lat", None),
                     "longitude": place.get("lon", None),
                     "tel": place.get("tel", None),
-                    "status": "activate"
+                    "status": "active"
                 }
 
                 booth = self.filter_booth_data(booth)
