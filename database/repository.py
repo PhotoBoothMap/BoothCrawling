@@ -23,7 +23,7 @@ class Repository(BaseDatabase):
         return brand_info
 
     def get_confirm_id_list(self):
-        query = f"select confirm_id from photo_booth"
+        query = f"select photo_booth.confirm_id from photo_booth"
         data = self.query_db(query).all()
         return [x[0] for x in data]
 
@@ -38,7 +38,6 @@ class Repository(BaseDatabase):
 
     def insert_booth(self, booth_data_list: List[BoothData]):
         booth_list = [asdict(booth_data) for booth_data in booth_data_list]
-
         query = """
             insert into photo_booth (
                 confirm_id,
@@ -58,7 +57,7 @@ class Repository(BaseDatabase):
                 values
         """
 
-        value_list = ["booth_id", "brand", "name", "address", "new_address", "homepage", "booth_type", "x_coordinate", "y_coordinate", "latitude", "longitude", "tel", "status"]
+        value_list = ["confirm_id", "brand_id", "booth_name", "address", "new_address", "homepage", "booth_type", "x_coordinate", "y_coordinate", "latitude", "longitude", "tel", "status"]
         for booth in booth_list:
             value_query = "("
             for value in value_list:
@@ -77,6 +76,11 @@ class Repository(BaseDatabase):
 
         update_query = " on duplicate key update "
         for value in value_list[1:]:
+            if value == "brand_id":
+                value = "brand"
+            elif value == "booth_name":
+                value = "name"
+
             update_query += f"{value}=values({value}), "
 
         query = query[:-2] + update_query[:-2] + ";"

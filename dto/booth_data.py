@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass
@@ -22,3 +22,8 @@ class BoothData:
     tel: Optional[str]
     status: Optional[str]
 
+
+@dataclass
+class CrawlingData:
+    new_brand_name_list: List[str]
+    booth_data_list: List[BoothData]
