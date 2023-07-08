@@ -1,7 +1,11 @@
+from dataclasses import asdict
+from typing import List
+
 from database.base_database import BaseDatabase
+from dto.booth_data import BoothData
 
 
-class DatabaseQuery(BaseDatabase):
+class Repository(BaseDatabase):
     def get_brand_id_by_name(self, brand_id):
         query = f"select id, name from brand where name = '{brand_id}'"
         data = self.query_db(query, ).all()
@@ -32,7 +36,9 @@ class DatabaseQuery(BaseDatabase):
 
         self.insert_query_db(query[:-1])
 
-    def insert_booth(self, booth_list):
+    def insert_booth(self, booth_data_list: List[BoothData]):
+        booth_list = [asdict(booth_data) for booth_data in booth_data_list]
+
         query = """
             insert into photo_booth (
                 confirm_id,
@@ -75,3 +81,4 @@ class DatabaseQuery(BaseDatabase):
 
         query = query[:-2] + update_query[:-2] + ";"
         self.insert_query_db(query)
+        print(f"insert {len(booth_list)} booths")
